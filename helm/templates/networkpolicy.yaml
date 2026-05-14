@@ -1,0 +1,103 @@
+﻿# Deny all ingress by default
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-ingress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+---
+# Allow internal service communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-helep-internal
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  ingress:
+  - from:
+    - podSelector: {}
+    ports:
+    - port: 8001
+      protocol: TCP
+    - port: 8002
+      protocol: TCP
+    - port: 8003
+      protocol: TCP
+    - port: 8004
+      protocol: TCP
+    - port: 8005
+      protocol: TCP
+  policyTypes:
+  - Ingress
+---
+# Allow Kafka access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-access
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kafka
+    ports:
+    - port: 9092
+      protocol: TCP
+  policyTypes:
+  - Egress
+---
+# Allow DNS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  egress:
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - port: 53
+      protocol: UDP
+  policyTypes:
+  - Egress
+{{- if .Values.ingress.enabled }}
+---
+# Allow ingress from ingress controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-ingress
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - port: 8001
+      protocol: TCP
+    - port: 8002
+      protocol: TCP
+    - port: 8003
+      protocol: TCP
+    - port: 8004
+      protocol: TCP
+    - port: 8005
+      protocol: TCP
+  policyTypes:
+  - Ingress
+{{- end }}

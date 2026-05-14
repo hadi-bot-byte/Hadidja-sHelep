@@ -1,7 +1,18 @@
-global:
+﻿global:
   kafka:
-    bootstrap: helep-kafka:9092
-  jwtSecret: super-secret-key-change-in-prod
+    bootstrap: helep-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092
+  jwtSecret: c3VwZXItc2VjcmV0LWtleS1jaGFuZ2UtaW4tcHJvZA==  # "super-secret-key-change-in-prod" in base64
+
+ingress:
+  enabled: false  # Set to true when ingress controller is ready
+  host: helep.local
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  cpuTarget: 70
+  memoryTarget: 80
 
 userService:
   image: helep-user-service:latest
