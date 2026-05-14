@@ -1,4 +1,4 @@
-﻿"""dispatch-service: localize victim, match a responder, enforce no-double-dispatch."""
+"""dispatch-service: localize victim, match a responder, enforce no-double-dispatch."""
 
 from __future__ import annotations
 import asyncio
@@ -20,6 +20,7 @@ from .db import (
 )
 from .events import consume, publish, health, producer, stop_producer
 from .matching import matcher, haversine_m
+from .circuit_breaker import get_circuit_breaker
 
 logging.basicConfig(level=logging.INFO)
 structlog.configure(processors=[structlog.processors.JSONRenderer()])
@@ -33,6 +34,11 @@ app.mount("/metrics", make_asgi_app())
 ASSIGNED = Counter("helep_dispatch_assigned_total", "Assignments")
 RELEASED = Counter("helep_dispatch_released_total", "Cancellations released")
 ZONE_HITS = Counter("helep_dispatch_zone_hits_total", "Danger zone hits")
+
+# Circuit breakers for critical operations
+cb_responders = get_circuit_breaker("all_free_responders", failure_threshold=3, timeout=30)
+cb_matcher    = get_circuit_breaker("matcher_pick",        failure_threshold=3, timeout=30)
+cb_reserve    = get_circuit_breaker("reserve_responder",   failure_threshold=3, timeout=30)
 
 class ConfirmIn(BaseModel):
     incident_id: str
@@ -52,16 +58,39 @@ async def handle_sos(p: dict) -> None:
     if assignment_for(iid):
         log.info("dispatch.idempotent", incident_id=iid)
         return
-    free = all_free_responders()
+
+    # Circuit breaker around: fetch free responders
+    try:
+        free = cb_responders.call(all_free_responders)
+    except Exception as e:
+        log.error("circuit_breaker.open", operation="all_free_responders", error=str(e))
+        return
+
     if not free:
         log.warning("no responders free", incident_id=iid)
         return
-    pick = matcher().pick(p["lat"], p["lon"], free)
+
+    # Circuit breaker around: matcher pick
+    try:
+        pick = cb_matcher.call(matcher().pick, p["lat"], p["lon"], free)
+    except Exception as e:
+        log.error("circuit_breaker.open", operation="matcher_pick", error=str(e))
+        return
+
     if not pick:
         return
-    if not reserve_responder_for(pick["id"], iid):
+
+    # Circuit breaker around: reserve responder
+    try:
+        reserved = cb_reserve.call(reserve_responder_for, pick["id"], iid)
+    except Exception as e:
+        log.error("circuit_breaker.open", operation="reserve_responder", error=str(e))
+        return
+
+    if not reserved:
         log.warning("race lost, retry next event", responder=pick["id"], incident_id=iid)
         return
+
     await publish(
         "responder.assigned",
         {"incident_id": iid, "responder_id": pick["id"], "victim_user": p["user_id"], "lat": p["lat"], "lon": p["lon"]},
@@ -115,3 +144,9 @@ async def confirm(body: ConfirmIn):
         raise HTTPException(404, "no matching assignment")
     await publish("responder.confirmed", {"incident_id": body.incident_id, "status": "EN_ROUTE"}, key=body.incident_id)
     return {"ok": True}
+
+@app.get("/circuit-breaker/status")
+async def circuit_breaker_status():
+    """Monitor circuit breaker states for all protected operations."""
+    from .circuit_breaker import _circuit_breakers
+    return {name: cb.get_state() for name, cb in _circuit_breakers.items()}
