@@ -1,0 +1,53 @@
+﻿apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: helep-dashboards
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  helep-services.json: |
+    {
+      "title": "HELEP Services Overview",
+      "uid": "helep-services",
+      "panels": [
+        {
+          "title": "SOS Requests Rate",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(helep_sos_triggered_total[5m])",
+              "legendFormat": "SOS Rate"
+            }
+          ]
+        },
+        {
+          "title": "Dispatch Assignments",
+          "type": "stat",
+          "targets": [
+            {
+              "expr": "sum(helep_dispatch_assigned_total)"
+            }
+          ]
+        },
+        {
+          "title": "Service Health Status",
+          "type": "table",
+          "targets": [
+            {
+              "expr": "up{namespace=\"helep\"}"
+            }
+          ]
+        },
+        {
+          "title": "Request Duration",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(helep_request_duration_seconds_sum[5m]) / rate(helep_request_duration_seconds_count[5m])",
+              "legendFormat": "Average Duration"
+            }
+          ]
+        }
+      ]
+    }

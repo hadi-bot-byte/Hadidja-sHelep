@@ -1,0 +1,55 @@
+﻿apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: helep-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus-stack
+spec:
+  groups:
+  - name: helep-service-alerts
+    rules:
+    - alert: HELEPServiceDown
+      expr: up{namespace="helep"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "HELEP service {{ $labels.app }} is down"
+        description: "Service {{ $labels.app }} in {{ $labels.namespace }} has been down for 1 minute"
+    
+    - alert: HighSOSRate
+      expr: rate(helep_sos_triggered_total[5m]) > 10
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High SOS rate detected"
+        description: "SOS rate is {{ $value }} requests/second"
+
+    - alert: DispatchFailureRate
+      expr: rate(helep_dispatch_assigned_total[5m]) / rate(helep_sos_triggered_total[5m]) < 0.8
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High dispatch failure rate"
+        description: "Only {{ $value | humanizePercentage }} of SOS requests are being dispatched"
+
+    - alert: HighMemoryUsage
+      expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage on node"
+        description: "Memory usage is above 85% for 5 minutes"
+
+    - alert: PodCrashLooping
+      expr: increase(kube_pod_container_status_restarts_total{namespace="helep"}[10m]) > 3
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod crash looping in HELEP"
+        description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in 10 minutes"

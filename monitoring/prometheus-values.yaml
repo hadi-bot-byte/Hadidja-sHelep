@@ -1,0 +1,110 @@
+﻿# prometheus-values.yaml - Custom configuration for HELEP monitoring
+
+# Grafana configuration
+grafana:
+  enabled: true
+  adminPassword: helep-admin-2024  # Change this!
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+  persistence:
+    enabled: true
+    size: 10Gi
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+      - name: 'default'
+        orgId: 1
+        folder: 'Services'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+  dashboardsConfigMaps:
+    helep-dashboards: helep-dashboards
+  additionalDataSources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus-stack-kube-prometheus-prometheus.monitoring:9090
+      access: proxy
+      isDefault: true
+  grafana.ini:
+    server:
+      root_url: http://localhost:3000
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
+    security:
+      admin_user: admin
+
+# Prometheus configuration
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 7d
+    retentionSize: 20Gi
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 2Gi
+        cpu: 1000m
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector:
+      matchLabels:
+        release: prometheus-stack
+    podMonitorSelectorNilUsesHelmValues: false
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+
+# Alertmanager configuration (optional - disabled for now)
+alertmanager:
+  enabled: false
+
+# Node Exporter for hardware metrics
+nodeExporter:
+  enabled: true
+
+# Kube State Metrics for Kubernetes objects
+kubeStateMetrics:
+  enabled: true
+
+# Prometheus Operator
+prometheusOperator:
+  enabled: true
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 200m
+
+# Default dashboards
+defaultDashboards:
+  enabled: true
+  time:
+    from: now-1h
+    to: now
+
+# Service monitors for HELEP services
+serviceMonitors:
+  helep:
+    enabled: true
+    namespace: helep
+    endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
