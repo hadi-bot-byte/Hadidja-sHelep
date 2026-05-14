@@ -1,0 +1,23 @@
+﻿grafana:
+  enabled: true
+  adminPassword: helep-admin-2024
+  image:
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 7d
+    retentionSize: 20GB
+    image:
+      tag: latest
+      pullPolicy: IfNotPresent
+
+prometheusOperator:
+  enabled: true
+  image:
+    tag: latest
+    pullPolicy: IfNotPresent
