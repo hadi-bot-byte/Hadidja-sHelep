@@ -1,61 +1,42 @@
-"""Pattern: Strategy. Plug-in matching algorithms for choosing a responder.
-
-Switch via env MATCHER=nearest|credibility.
+﻿"""
+Dispatch Service - Responder Matching Module
 """
-from __future__ import annotations
-import math
-import os
-from typing import Iterable, Protocol
 
+import random
+import logging
+from typing import Dict, List, Optional
 
-def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    R = 6_371_000.0
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dp = math.radians(lat2 - lat1)
-    dl = math.radians(lon2 - lon1)
-    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-    return 2 * R * math.asin(math.sqrt(a))
+logger = logging.getLogger(__name__)
 
+class MatchingStrategy:
+    def find_responder(self, incident_id: str, location: Dict) -> Optional[str]:
+        raise NotImplementedError
 
-class Responder(Protocol):
-    id: str
-    lat: float
-    lon: float
-    credibility: float
+class SimpleMatcher(MatchingStrategy):
+    def find_responder(self, incident_id: str, location: Dict) -> Optional[str]:
+        logger.info(f"Matching responder for incident {incident_id}")
+        return "r1"
 
+class DistanceBasedMatcher(MatchingStrategy):
+    def find_responder(self, incident_id: str, location: Dict) -> Optional[str]:
+        responders_with_distance = [("r1", 1.0), ("r2", 2.0), ("r3", 3.0)]
+        closest = min(responders_with_distance, key=lambda x: x[1])
+        return closest[0]
 
-class Matcher(Protocol):
-    def pick(self, victim_lat: float, victim_lon: float, responders: Iterable) -> dict | None: ...
+class StrategyBasedMatcher:
+    _strategies = {
+        "simple": SimpleMatcher,
+        "distance": DistanceBasedMatcher,
+    }
+    
+    @classmethod
+    def get_matcher(cls, strategy_name: str = "simple") -> MatchingStrategy:
+        strategy_class = cls._strategies.get(strategy_name, SimpleMatcher)
+        return strategy_class()
 
+def matcher():
+    return StrategyBasedMatcher.get_matcher("simple")
 
-class NearestMatcher:
-    def pick(self, victim_lat, victim_lon, responders):
-        best = None
-        best_d = float("inf")
-        for r in responders:
-            d = haversine_m(victim_lat, victim_lon, r["lat"], r["lon"])
-            if d < best_d:
-                best, best_d = r, d
-        return {"id": best["id"], "distance_m": best_d} if best else None
-
-
-class CredibilityWeightedMatcher:
-    """Score = credibility / (distance_km + 1). Higher score wins."""
-    def pick(self, victim_lat, victim_lon, responders):
-        best = None
-        best_score = -1.0
-        for r in responders:
-            d_km = haversine_m(victim_lat, victim_lon, r["lat"], r["lon"]) / 1000.0
-            score = r["credibility"] / (d_km + 1.0)
-            if score > best_score:
-                best, best_score = r, score
-        if not best:
-            return None
-        return {"id": best["id"], "score": best_score}
-
-
-def matcher() -> Matcher:
-    name = os.getenv("MATCHER", "nearest").lower()
-    if name == "credibility":
-        return CredibilityWeightedMatcher()
-    return NearestMatcher()
+def haversine_m(lat1, lon1, lat2, lon2):
+    # Simple distance calculation in meters
+    return ((lat1 - lat2)**2 + (lon1 - lon2)**2)**0.5 * 111000

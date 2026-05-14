@@ -1,0 +1,7 @@
+image: helep-dispatch-service:latest
+port: 8003
+replicas: 1
+global:
+  kafka:
+    bootstrap: helep-kafka:9092
+  jwtSecret: super-secret-key-change-in-prod

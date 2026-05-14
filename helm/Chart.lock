@@ -1,0 +1,18 @@
+dependencies:
+- name: user-service
+  repository: file://charts/user-service
+  version: 0.1.0
+- name: sos-service
+  repository: file://charts/sos-service
+  version: 0.1.0
+- name: dispatch-service
+  repository: file://charts/dispatch-service
+  version: 0.1.0
+- name: notification-service
+  repository: file://charts/notification-service
+  version: 0.1.0
+- name: analytics-service
+  repository: file://charts/analytics-service
+  version: 0.1.0
+digest: sha256:1f965a644015e2c1df109459ce67ce5419b77a3b50f4823810c102a328671aea
+generated: "2026-05-13T10:32:42.6326594-12:00"

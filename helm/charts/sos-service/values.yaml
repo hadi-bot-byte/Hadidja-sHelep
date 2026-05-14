@@ -1,0 +1,7 @@
+image: helep-sos-service:latest
+port: 8002
+replicas: 1
+global:
+  kafka:
+    bootstrap: helep-kafka:9092
+  jwtSecret: super-secret-key-change-in-prod
